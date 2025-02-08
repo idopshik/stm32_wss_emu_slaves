@@ -67,6 +67,16 @@ static void MX_TIM1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+
+    uint8_t test_str[] = "Ticki\r\n\0";
+
+    if (htim->Instance == TIM1) {
+        HAL_UART_Transmit(&huart1, test_str, 8, 30);  // send message via UART
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -104,6 +114,12 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
+
+    HAL_TIM_Base_Start_IT(&htim1);
+    HAL_TIM_Base_Start_IT(&htim2);
+    HAL_TIM_Base_Start_IT(&htim5);
+
+    HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
 
   /* USER CODE END 2 */
 
@@ -221,7 +237,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 10000;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 320;
+  htim1.Init.Period = 8400;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
