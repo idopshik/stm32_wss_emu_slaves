@@ -1,0 +1,12 @@
+board tripplecan
+
+PC6 - i2c4_SDA
+PC7 - i2c4_SCA
+
+board with stm32f4
+
+-25MHz
+32.768 кHz часовой кварц.
+
+Загружать через WeAct Studio Download Tool
+
