@@ -10,3 +10,8 @@ board with stm32f4
 
 Загружать через WeAct Studio Download Tool
 
+PC13 - blue_led
+
+PA0 - key
+
+timer1 подключён внутри контроллер в шине ABP2

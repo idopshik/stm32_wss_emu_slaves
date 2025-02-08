@@ -21,6 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <string.h>
+/* size_t *strlen (const char *str); */
 
 /* USER CODE END Includes */
 
@@ -31,6 +33,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+                            
+uint8_t TWI_deal(int *rpm_arr );
 
 /* USER CODE END PD */
 
@@ -47,6 +51,11 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
 
 UART_HandleTypeDef huart1;
+
+uint8_t TWI_received = 0;
+uint8_t TWI_RxData[4] = {0, 0, 0, 0};
+uint8_t device_addr = 0x10; //I2C_DEVICE_ADDRESS;
+
 
 /* USER CODE BEGIN PV */
 
@@ -73,8 +82,54 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     uint8_t test_str[] = "Ticki\r\n\0";
 
     if (htim->Instance == TIM1) {
-        HAL_UART_Transmit(&huart1, test_str, 8, 30);  // send message via UART
+        HAL_UART_Transmit(&huart1, test_str, strlen((char *)test_str), 30);
     }
+}
+
+extern void HAL_I2C_ListenCpltCallback (I2C_HandleTypeDef *hi2c1)
+{
+	HAL_I2C_EnableListen_IT(hi2c1);
+}
+
+extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c1, uint8_t TransferDirection, uint16_t AddrMatchCode)
+{
+	if(TransferDirection == I2C_DIRECTION_TRANSMIT)  // if the master wants to transmit the data
+	{
+		HAL_I2C_Slave_Sequential_Receive_IT(hi2c1, TWI_RxData, 4, I2C_FIRST_AND_LAST_FRAME);
+	}
+	else  // master requesting the data is not supported yet
+	{
+		Error_Handler();
+	}
+}
+
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c1)
+{
+    TWI_received++;
+}
+
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c1)
+{
+    HAL_I2C_EnableListen_IT(hi2c1);
+}
+
+uint8_t TWI_deal(int *rpm_arr )
+{
+
+    uint16_t newval = 0;
+
+    newval |= ((int)TWI_RxData[0]) << 8;
+    newval |= (int)TWI_RxData[1];
+
+    rpm_arr[0] = newval;
+
+    newval = 0;
+
+    newval |= ((int)TWI_RxData[2]) << 8;
+    newval |= (int)TWI_RxData[3];
+
+    rpm_arr[1] = newval;
+    return 0;
 }
 
 /* USER CODE END 0 */
@@ -96,6 +151,10 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
+  RCC->APB1ENR |= (1<<21);  // enable I2C CLOCK
+  RCC->AHB1ENR |= (1<<1);  // Enable GPIOB CLOCK
+
 
   /* USER CODE END Init */
 
@@ -120,18 +179,32 @@ int main(void)
     HAL_TIM_Base_Start_IT(&htim5);
 
     HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
+    
+    HAL_I2C_EnableListen_IT(&hi2c1);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  int arr_WhRPMs[] = {0, 0};
+  
   while (1)
   {
     /* USER CODE END WHILE */
 
+    HAL_Delay(0.001); // in sec.
+                     //
+    if (TWI_received < 0) {
+        TWI_received = 0;
+
+        TWI_deal(arr_WhRPMs);
+
+        HAL_GPIO_TogglePin(BlueLed_GPIO_Port, BlueLed_Pin);
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+}
 }
 
 /**
@@ -198,7 +271,7 @@ static void MX_I2C1_Init(void)
   hi2c1.Instance = I2C1;
   hi2c1.Init.ClockSpeed = 100000;
   hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.OwnAddress1 = 32;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
