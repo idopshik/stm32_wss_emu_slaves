@@ -7,6 +7,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+#include <stdio.h>
 #include <string.h>
 /* size_t *strlen (const char *str); */
 
@@ -67,6 +69,15 @@ static void MX_TIM1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
+int _write(int file, const unsigned char *ptr, int len)
+{
+	// send string through UART
+	HAL_UART_Transmit(&huart1, ptr, strlen((char *)ptr), 30);
+	return 0;
+}
+
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -129,6 +140,7 @@ int main(void)
     Error_Handler();
   }
 
+    printf("Uart Debug through printf is active\t\n");
 
   /* USER CODE END 2 */
 
