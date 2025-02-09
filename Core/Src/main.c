@@ -44,6 +44,8 @@ uint8_t TWI_deal(int *rpm_arr );
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+
+
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim1;
@@ -58,6 +60,23 @@ uint8_t device_addr = 0x10; //I2C_DEVICE_ADDRESS;
 
 
 /* USER CODE BEGIN PV */
+
+#define APB1_CLK 150000000
+#define MinutTeethFactor 1.6
+#define numFL 0
+#define numFR 1
+#define numRL 2
+#define numRR 3
+
+typedef struct {
+    uint8_t wheel_num;
+    TIM_HandleTypeDef *htim;
+    int prev_speed;
+    int prev_psc;
+    int cur_psc;
+    int initial_tmp_flag;
+    uint8_t psc_change_flag;
+} whl_chnl;
 
 /* USER CODE END PV */
 
@@ -132,6 +151,137 @@ uint8_t TWI_deal(int *rpm_arr )
     return 0;
 }
 
+
+uint32_t calculete_period_only(int val)
+{
+    // For 32bit timer
+
+    float factor = 0.02;
+    return (APB1_CLK / (val * factor * MinutTeethFactor * (12 + 1))) - 1;  // значение регистра ARR
+}
+
+
+
+void set_new_speeds(int vFLrpm, int vFRrpm, int vRLrpm, int vRRrpm, whl_chnl *whl_arr[])
+{
+    //__HAL_TIM_SET_PRESCALER(&htim3, val );
+    //__HAL_TIM_SET_AUTORELOAD(&htim3, val );
+    /* permutations! */
+    /* 1) changing prescaler up or down  */
+    /* 2) the same prescaler */
+    /* ----- */
+    /* 1) going up (speed up) */
+    /* 2) going down. */
+
+    // 32-bit timers first
+
+    ////////////    TIMER2 -  RL  ///////////////
+    if (vRLrpm == 0) {
+        TIM2->CR1 &= ~((uint16_t)TIM_CR1_CEN);
+    }
+    else {
+        TIM2->CR1 |= TIM_CR1_CEN;  // enable
+                                   //
+        uint32_t current_32bit_period = calculete_period_only(vRLrpm);
+
+        if (vRLrpm > whl_arr[numRL]->prev_speed) {
+            TIM2->CR1 |= TIM_CR1_ARPE;
+            TIM2->ARR = current_32bit_period;
+
+            if (TIM2->CNT > current_32bit_period) {
+                TIM2->EGR |= TIM_EGR_UG;
+            }
+
+            /* HAL_GPIO_TogglePin(LED_RX2_GPIO_Port, LED_RX2_Pin); */
+        }
+        else {
+            /* my_printf(" ARR: %d\n\r", arr_with_calculations[0]); */
+
+            /* HAL_GPIO_TogglePin(LED_TX2_GPIO_Port, LED_TX2_Pin); */
+
+            if (TIM2->CNT < current_32bit_period) {
+                TIM2->CR1 |= TIM_CR1_ARPE;
+                TIM2->ARR = current_32bit_period;
+            }
+            else {
+                // Не должна никогда выполняться.
+                TIM2->CR1 &= ~TIM_CR1_ARPE;
+                TIM2->ARR = current_32bit_period;
+            }
+        }
+
+        //Костыльный предохранитель от убегания.
+        if (TIM2->CNT > current_32bit_period) {
+            TIM2->EGR |= TIM_EGR_UG;
+        }
+    }
+    whl_arr[numRL]->prev_speed = vRLrpm;
+
+
+
+
+
+
+
+    ////////////    TIMER5 -  RR  ///////////////
+    if (vRRrpm == 0) {
+        TIM5->CR1 &= ~((uint16_t)TIM_CR1_CEN);
+    }
+    else {
+        TIM5->CR1 |= TIM_CR1_CEN;  // enable
+                                   //
+        uint32_t current_32bit_period = calculete_period_only(vRRrpm);
+
+        if (vRRrpm > whl_arr[numRR]->prev_speed) {
+            TIM5->CR1 |= TIM_CR1_ARPE;
+            TIM5->ARR = current_32bit_period;
+
+            if (TIM5->CNT > current_32bit_period) {
+                TIM5->EGR |= TIM_EGR_UG;
+            }
+
+            /* HAL_GPIO_TogglePin(LED_RX2_GPIO_Port, LED_RX2_Pin); */
+        }
+        else {
+            /* my_printf(" ARR: %d\n\r", arr_with_calculations[0]); */
+
+            /* HAL_GPIO_TogglePin(LED_TX2_GPIO_Port, LED_TX2_Pin); */
+
+            if (TIM5->CNT < current_32bit_period) {
+                TIM5->CR1 |= TIM_CR1_ARPE;
+                TIM5->ARR = current_32bit_period;
+            }
+            else {
+                TIM5->CR1 &= ~TIM_CR1_ARPE;
+                TIM5->ARR = current_32bit_period;
+            }
+        }
+
+        //Костыльный предохранитель от убегания.
+        if (TIM5->CNT > current_32bit_period) {
+            TIM5->EGR |= TIM_EGR_UG;
+            /* HAL_GPIO_TogglePin(LED_RX3_GPIO_Port, LED_RX3_Pin); */
+        }
+    }
+    whl_arr[numRR]->prev_speed = vRRrpm;
+
+
+
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
 /* USER CODE END 0 */
 
 /**
@@ -187,6 +337,20 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   int arr_WhRPMs[] = {0, 0};
+
+
+    whl_chnl fl_whl_s = {numFL, &htim2, 0, 12, 0, 0};
+    whl_chnl *p_fl_whl;
+    p_fl_whl = &fl_whl_s;
+
+    whl_chnl rr_whl_s = {numRR, &htim5, 0, 12, 0, 0};
+    whl_chnl *p_rr_whl;
+    p_rr_whl = &rr_whl_s;
+
+    whl_chnl *whl_arr[4];
+
+    whl_arr[numFL] = p_fl_whl;
+    whl_arr[numRR] = p_rr_whl;
   
   while (1)
   {
@@ -202,6 +366,12 @@ int main(void)
         HAL_GPIO_TogglePin(BlueLed_GPIO_Port, BlueLed_Pin);
 
     /* USER CODE BEGIN 3 */
+
+
+
+
+
+
   }
   /* USER CODE END 3 */
 }
