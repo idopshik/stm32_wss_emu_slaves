@@ -1,23 +1,9 @@
 /* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
 /* USER CODE END Header */
+
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c_slave_u.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -30,28 +16,18 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
-#define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
-#define TXBUFFERSIZE                      (COUNTOF(aTxBuffer))
-#define RXBUFFERSIZE                      TXBUFFERSIZE
-
-__IO uint32_t     Transfer_Direction = 0;
-__IO uint32_t     Xfer_Complete = 0;
-
 /* USER CODE BEGIN PD */
 
 
 /* Buffer used for transmission */
-uint8_t aTxBuffer[4];
 
 /* Buffer used for reception */
-uint8_t aRxBuffer[4];
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
                             
-uint8_t TWI_deal(int *rpm_arr );
 
 /* USER CODE END PD */
 
@@ -103,51 +79,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 
-/* extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c1, uint8_t TransferDirection, uint16_t AddrMatchCode) */
-/* { */
-	/* if(TransferDirection == I2C_DIRECTION_TRANSMIT)  // if the master wants to transmit the data */
-	/* { */
-		/* HAL_I2C_Slave_Sequential_Receive_IT(hi2c1, TWI_RxData, 4, I2C_FIRST_AND_LAST_FRAME); */
-	/* } */
-	/* else  // master requesting the data is not supported yet */
-	/* { */
-		/* Error_Handler(); */
-	/* } */
-/* } */
-
-void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c1)
-{
-
-    Xfer_Complete = 1;
-    TWI_received++;
-}
-
-
-uint8_t TWI_deal(int *rpm_arr )
-{
-
-    uint16_t newval = 0;
-
-    newval |= ((int)TWI_RxData[0]) << 8;
-    newval |= (int)TWI_RxData[1];
-
-    rpm_arr[0] = newval;
-
-    newval = 0;
-
-    newval |= ((int)TWI_RxData[2]) << 8;
-    newval |= (int)TWI_RxData[3];
-
-    rpm_arr[1] = newval;
-    return 0;
-}
-
-
-
-
-
-
-
 
 /* USER CODE END 0 */
 
@@ -169,8 +100,8 @@ int main(void)
 
   /* USER CODE BEGIN Init */
 
-  RCC->APB1ENR |= (1<<21);  // enable I2C CLOCK
-  RCC->AHB1ENR |= (1<<1);  // Enable GPIOB CLOCK
+  /* RCC->APB1ENR |= (1<<21);  // enable I2C CLOCK */
+  /* RCC->AHB1ENR |= (1<<1);  // Enable GPIOB CLOCK */
 
 
   /* USER CODE END Init */
@@ -190,7 +121,6 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
     HAL_TIM_Base_Start_IT(&htim1);
-
     HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
     
   if(HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
@@ -198,8 +128,6 @@ int main(void)
     /* Transfer error in reception process */
     Error_Handler();
   }
-
-    __I2C1_CLK_ENABLE();
 
 
   /* USER CODE END 2 */
@@ -213,32 +141,7 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-    /* HAL_Delay(0.001); // in sec. */
-                     
-    /* if (TWI_received < 0) { */
-        /* TWI_received = 0; */
-
-        /* TWI_deal(arr_WhRPMs); */
-
-        /* HAL_GPIO_TogglePin(BlueLed_GPIO_Port, BlueLed_Pin); */
-
-
     /* USER CODE BEGIN 3 */
-
-           if (Xfer_Complete ==1)
-           {
-            HAL_Delay(1);
-             /*##- Put I2C peripheral in listen mode process ###########################*/
-         if(HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
-         {
-           /* Transfer error in reception process */
-           Error_Handler();
-         }
-           Xfer_Complete =0;
-           }
-
-
-
 
   }
   /* USER CODE END 3 */
@@ -472,82 +375,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *I2cHandle)
-{
-  /* Toggle LED4: Transfer in transmission process is correct */
-
-  Xfer_Complete = 1;
-  aTxBuffer[0]++;
-  aTxBuffer[1]++;
-  aTxBuffer[2]++;
-  aTxBuffer[3]++;
-
-}
-
-
-
-
-
-
-void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode)
-{
-  Transfer_Direction = TransferDirection;
-  if (Transfer_Direction != 0)
-  {
-     /*##- Start the transmission process #####################################*/
-  /* While the I2C in reception process, user can transmit data through
-     "aTxBuffer" buffer */
-  if (HAL_I2C_Slave_Seq_Transmit_IT(&hi2c1, (uint8_t *)aTxBuffer, TXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
-
-    {
-    /* Transfer error in transmission process */
-    Error_Handler();
-  }
-
-  }
-  else
-  {
-
-      /*##- Put I2C peripheral in reception process ###########################*/
-  if (HAL_I2C_Slave_Seq_Receive_IT(&hi2c1, (uint8_t *)aRxBuffer, RXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
-    {
-    /* Transfer error in reception process */
-    Error_Handler();
-  }
-
-  }
-
-}
-
-
-
-
-
-void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c)
-{
-        HAL_I2C_EnableListen_IT(hi2c);
-
-        HAL_GPIO_TogglePin(BlueLed_GPIO_Port, BlueLed_Pin);
-
-}
-
-void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *I2cHandle)
-{
-  /** Error_Handler() function is called when error occurs.
-    * 1- When Slave doesn't acknowledge its address, Master restarts communication.
-    * 2- When Master doesn't acknowledge the last data transferred, Slave doesn't care in this example.
-    */
-
-
-  /* HAL_I2C_EnableListen_IT(hi2c1);  // может быть это важно. */
-
-
-  if (HAL_I2C_GetError(I2cHandle) != HAL_I2C_ERROR_AF)
-  {
-    Error_Handler();
-  }
-}
 
 /* USER CODE END 4 */
 
