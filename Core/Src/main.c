@@ -775,6 +775,8 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
 
 void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c)
 {
+        HAL_I2C_EnableListen_IT(hi2c);
+
         HAL_GPIO_TogglePin(BlueLed_GPIO_Port, BlueLed_Pin);
 
 }
