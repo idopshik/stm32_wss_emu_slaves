@@ -66,8 +66,6 @@ uint8_t TWI_deal(int *rpm_arr );
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim1;
-TIM_HandleTypeDef htim2;
-TIM_HandleTypeDef htim5;
 
 UART_HandleTypeDef huart1;
 
@@ -78,22 +76,6 @@ uint8_t device_addr = 0x10; //I2C_DEVICE_ADDRESS;
 
 /* USER CODE BEGIN PV */
 
-#define APB1_CLK 150000000
-#define MinutTeethFactor 1.6
-#define numFL 0
-#define numFR 1
-#define numRL 2
-#define numRR 3
-
-typedef struct {
-    uint8_t wheel_num;
-    TIM_HandleTypeDef *htim;
-    int prev_speed;
-    int prev_psc;
-    int cur_psc;
-    int initial_tmp_flag;
-    uint8_t psc_change_flag;
-} whl_chnl;
 
 /* USER CODE END PV */
 
@@ -101,8 +83,6 @@ typedef struct {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_TIM5_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
@@ -163,130 +143,6 @@ uint8_t TWI_deal(int *rpm_arr )
 }
 
 
-uint32_t calculete_period_only(int val)
-{
-    // For 32bit timer
-
-    float factor = 0.02;
-    return (APB1_CLK / (val * factor * MinutTeethFactor * (12 + 1))) - 1;  // значение регистра ARR
-}
-
-
-
-void set_new_speeds(int vFLrpm, int vFRrpm, int vRLrpm, int vRRrpm, whl_chnl *whl_arr[])
-{
-    //__HAL_TIM_SET_PRESCALER(&htim3, val );
-    //__HAL_TIM_SET_AUTORELOAD(&htim3, val );
-    /* permutations! */
-    /* 1) changing prescaler up or down  */
-    /* 2) the same prescaler */
-    /* ----- */
-    /* 1) going up (speed up) */
-    /* 2) going down. */
-
-    // 32-bit timers first
-
-    ////////////    TIMER2 -  RL  ///////////////
-    if (vRLrpm == 0) {
-        TIM2->CR1 &= ~((uint16_t)TIM_CR1_CEN);
-    }
-    else {
-        TIM2->CR1 |= TIM_CR1_CEN;  // enable
-                                   //
-        uint32_t current_32bit_period = calculete_period_only(vRLrpm);
-
-        if (vRLrpm > whl_arr[numRL]->prev_speed) {
-            TIM2->CR1 |= TIM_CR1_ARPE;
-            TIM2->ARR = current_32bit_period;
-
-            if (TIM2->CNT > current_32bit_period) {
-                TIM2->EGR |= TIM_EGR_UG;
-            }
-
-            /* HAL_GPIO_TogglePin(LED_RX2_GPIO_Port, LED_RX2_Pin); */
-        }
-        else {
-            /* my_printf(" ARR: %d\n\r", arr_with_calculations[0]); */
-
-            /* HAL_GPIO_TogglePin(LED_TX2_GPIO_Port, LED_TX2_Pin); */
-
-            if (TIM2->CNT < current_32bit_period) {
-                TIM2->CR1 |= TIM_CR1_ARPE;
-                TIM2->ARR = current_32bit_period;
-            }
-            else {
-                // Не должна никогда выполняться.
-                TIM2->CR1 &= ~TIM_CR1_ARPE;
-                TIM2->ARR = current_32bit_period;
-            }
-        }
-
-        //Костыльный предохранитель от убегания.
-        if (TIM2->CNT > current_32bit_period) {
-            TIM2->EGR |= TIM_EGR_UG;
-        }
-    }
-    whl_arr[numRL]->prev_speed = vRLrpm;
-
-
-
-
-
-
-
-    ////////////    TIMER5 -  RR  ///////////////
-    if (vRRrpm == 0) {
-        TIM5->CR1 &= ~((uint16_t)TIM_CR1_CEN);
-    }
-    else {
-        TIM5->CR1 |= TIM_CR1_CEN;  // enable
-                                   //
-        uint32_t current_32bit_period = calculete_period_only(vRRrpm);
-
-        if (vRRrpm > whl_arr[numRR]->prev_speed) {
-            TIM5->CR1 |= TIM_CR1_ARPE;
-            TIM5->ARR = current_32bit_period;
-
-            if (TIM5->CNT > current_32bit_period) {
-                TIM5->EGR |= TIM_EGR_UG;
-            }
-
-            /* HAL_GPIO_TogglePin(LED_RX2_GPIO_Port, LED_RX2_Pin); */
-        }
-        else {
-            /* my_printf(" ARR: %d\n\r", arr_with_calculations[0]); */
-
-            /* HAL_GPIO_TogglePin(LED_TX2_GPIO_Port, LED_TX2_Pin); */
-
-            if (TIM5->CNT < current_32bit_period) {
-                TIM5->CR1 |= TIM_CR1_ARPE;
-                TIM5->ARR = current_32bit_period;
-            }
-            else {
-                TIM5->CR1 &= ~TIM_CR1_ARPE;
-                TIM5->ARR = current_32bit_period;
-            }
-        }
-
-        //Костыльный предохранитель от убегания.
-        if (TIM5->CNT > current_32bit_period) {
-            TIM5->EGR |= TIM_EGR_UG;
-            /* HAL_GPIO_TogglePin(LED_RX3_GPIO_Port, LED_RX3_Pin); */
-        }
-    }
-    whl_arr[numRR]->prev_speed = vRRrpm;
-
-
-
-
-
-
-
-
-
-
-}
-
 
 
 
@@ -329,15 +185,11 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
-  MX_TIM2_Init();
-  MX_TIM5_Init();
   MX_USART1_UART_Init();
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
     HAL_TIM_Base_Start_IT(&htim1);
-    HAL_TIM_Base_Start_IT(&htim2);
-    HAL_TIM_Base_Start_IT(&htim5);
 
     HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
     
@@ -354,21 +206,8 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  int arr_WhRPMs[] = {0, 0};
 
 
-    whl_chnl fl_whl_s = {numFL, &htim2, 0, 12, 0, 0};
-    whl_chnl *p_fl_whl;
-    p_fl_whl = &fl_whl_s;
-
-    whl_chnl rr_whl_s = {numRR, &htim5, 0, 12, 0, 0};
-    whl_chnl *p_rr_whl;
-    p_rr_whl = &rr_whl_s;
-
-    whl_chnl *whl_arr[4];
-
-    whl_arr[numFL] = p_fl_whl;
-    whl_arr[numRR] = p_rr_whl;
   
   while (1)
   {
@@ -558,97 +397,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 2 */
 
-}
-
-/**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4294967295;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
 
 }
 
-/**
-  * @brief TIM5 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM5_Init(void)
-{
-
-  /* USER CODE BEGIN TIM5_Init 0 */
-
-  /* USER CODE END TIM5_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM5_Init 1 */
-
-  /* USER CODE END TIM5_Init 1 */
-  htim5.Instance = TIM5;
-  htim5.Init.Prescaler = 0;
-  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 4294967295;
-  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM5_Init 2 */
-
-  /* USER CODE END TIM5_Init 2 */
-
-}
 
 /**
   * @brief USART1 Initialization Function
