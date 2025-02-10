@@ -30,6 +30,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
                             
+uint8_t checksum(uint8_t *array, uint32_t size);
 
 /* USER CODE END PD */
 
@@ -46,6 +47,15 @@ I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim1;
 
 UART_HandleTypeDef huart1;
+
+
+#define BufferSIZE 5
+
+uint8_t i2c_received = 0 ;
+
+uint8_t RxData[BufferSIZE];
+uint8_t TxData[BufferSIZE];
+
 
 uint8_t TWI_received = 0;
 uint8_t TWI_RxData[4] = {0, 0, 0, 0};
@@ -89,7 +99,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     }
 }
 
+uint8_t checksum(uint8_t *array, uint32_t size)
+{
+    uint8_t cs = 0;
 
+    while (size--) cs ^= *array++;
+
+    printf("int: %d\t\n", cs);
+    return cs;
+}
 
 /* USER CODE END 0 */
 
@@ -147,13 +165,26 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-
+    uint8_t chsum;
   
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+      if (i2c_received == 1){
+          i2c_received = 0;
+
+
+         chsum = checksum(RxData, 4);
+        if (chsum == RxData[4]){
+            printf("correct\t\n");
+        }
+        else{
+            printf("badly_written\t\n");
+        }
+      }
+
 
   }
   /* USER CODE END 3 */
