@@ -1,4 +1,11 @@
 /* USER CODE BEGIN Header */
+/*
+
+   Первый байт - тип посылки. 0x10 - данные, 0x30 - команда
+   длина всегда фиксированная - ШЕСТЬ байт. (тип, 4 нагрузки и псввдоCRC)
+
+*/
+
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -64,9 +71,14 @@ uint8_t i2c_received = 0 ;
 uint8_t not_i2c_buffer[BufferSIZE];
 
 
-uint8_t TWI_received = 0;
-uint8_t TWI_RxData[4] = {0, 0, 0, 0};
 uint8_t device_addr = 0x10; //I2C_DEVICE_ADDRESS;
+
+uint8_t secu_tick = 0;
+
+uint16_t receive_counters[]  = {0, 0};
+
+
+
 
 
 /* USER CODE BEGIN PV */
@@ -109,12 +121,13 @@ int _write(int file, char *data, int len)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+    secu_tick = 1;
 
-    uint8_t test_str[] = "Ticki\r\n\0";
+    /* uint8_t test_str[] = "Ticki\r\n\0"; */
 
-    if (htim->Instance == TIM1) {
-        HAL_UART_Transmit(&huart1, test_str, strlen((char *)test_str), 30);
-    }
+    /* if (htim->Instance == TIM1) { */
+        /* HAL_UART_Transmit(&huart1, test_str, strlen((char *)test_str), 30); */
+    /* } */
 }
 
 uint8_t checksum(uint8_t *array, uint32_t size)
@@ -190,8 +203,6 @@ int main(void)
     uint8_t testbuf[] = {10, 20, 30, 40, 50};
     
   
-    uint8_t goodtest[] = "yes\r\n";
-    uint8_t notest_[] = "no\r\n";
 
   while (1)
   {
@@ -208,20 +219,41 @@ int main(void)
       /* if (test == 1){ */
 
 
-        chsum = checksum(not_i2c_buffer, 4);
+        chsum = checksum(not_i2c_buffer, 5);
         /* printf("sum: %d\n\t", chsum); */
 
-        if (chsum == not_i2c_buffer[4]){
+        if (chsum == not_i2c_buffer[5]){
             /* printf("correct\t\n"); */
-            /* HAL_UART_Transmit(&huart1, goodtest, strlen((char *)goodtest), 30); */
 
-            printf("noT\n\t");
+            /* printf("noT\n\t"); */
+            receive_counters[1] ++ ;
+
+            //здесь полезная работа. Вызов функций
+            if (not_i2c_buffer[0] == 0){
+
+            }
+            else if (not_i2c_buffer[0] == 1){
+            } 
+            else{
+                //добавить обработчик/регистратор ошибок
+            }
         }
         else{
             /* printf("badly_written\t\n"); */
-            HAL_UART_Transmit(&huart1, notest_, strlen((char *)notest_), 30);
+            receive_counters[0] ++ ;
         }
       }
+
+
+
+    if (secu_tick == 1){
+        printf("res ok: %d, troubles: %d\n\r",  receive_counters[1], receive_counters[0]);
+        receive_counters[0]  = 0;
+        receive_counters[1]  = 0;
+
+        secu_tick = 0;
+
+    }
 
 
   }

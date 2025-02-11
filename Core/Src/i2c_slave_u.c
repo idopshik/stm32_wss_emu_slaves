@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define BufferSIZE 5
+#define BufferSIZE 6
 
 extern uint8_t i2c_received;
 
@@ -69,7 +69,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
         firstData = 0;
         count ++;
 
-        HAL_I2C_Slave_Seq_Receive_IT(hi2c, RxData+count, 4,  I2C_LAST_FRAME);
+        HAL_I2C_Slave_Seq_Receive_IT(hi2c, RxData+count, BufferSIZE - 1,  I2C_LAST_FRAME);
 
 
     }
