@@ -10,6 +10,14 @@
 
 #include <stdio.h>
 #include <string.h>
+
+#include <inttypes.h>
+#include <stdarg.h>
+
+
+//for printf
+#include  <errno.h>
+#include  <sys/unistd.h> // STDOUT_FILENO, STDERR_FILENO
 /* size_t *strlen (const char *str); */
 
 /* USER CODE END Includes */
@@ -53,8 +61,7 @@ UART_HandleTypeDef huart1;
 
 uint8_t i2c_received = 0 ;
 
-uint8_t RxData[BufferSIZE];
-uint8_t TxData[BufferSIZE];
+uint8_t not_i2c_buffer[BufferSIZE];
 
 
 uint8_t TWI_received = 0;
@@ -81,11 +88,22 @@ static void MX_TIM1_Init(void);
 /* USER CODE BEGIN 0 */
 
 
-int _write(int file, const unsigned char *ptr, int len)
+// this is for printf
+
+int _write(int file, char *data, int len)
 {
-	// send string through UART
-	HAL_UART_Transmit(&huart1, ptr, strlen((char *)ptr), 30);
-	return 0;
+   if ((file != STDOUT_FILENO) && (file != STDERR_FILENO))
+   {
+      errno = EBADF;
+      return -1;
+   }
+
+   // arbitrary timeout 1000
+   HAL_StatusTypeDef status =
+      HAL_UART_Transmit(&huart1, (uint8_t*)data, len, 1000);
+
+   // return # of bytes written - as best we can tell
+   return (status == HAL_OK ? len : 0);
 }
 
 
@@ -105,7 +123,7 @@ uint8_t checksum(uint8_t *array, uint32_t size)
 
     while (size--) cs ^= *array++;
 
-    printf("int: %d\t\n", cs);
+    /* printf("int: %d\t\n", cs); */
     return cs;
 }
 
@@ -158,7 +176,7 @@ int main(void)
     Error_Handler();
   }
 
-    printf("Uart Debug through printf is active\t\n");
+    printf("Uart Debug through printf is active\n");
 
   /* USER CODE END 2 */
 
@@ -166,7 +184,15 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
     uint8_t chsum;
+    uint8_t test;
+    test = 1;
+
+    uint8_t testbuf[] = {10, 20, 30, 40, 50};
+    
   
+    uint8_t goodtest[] = "yes\r\n";
+    uint8_t notest_[] = "no\r\n";
+
   while (1)
   {
     /* USER CODE END WHILE */
@@ -175,13 +201,25 @@ int main(void)
       if (i2c_received == 1){
           i2c_received = 0;
 
+      /* HAL_Delay(100); */
 
-         chsum = checksum(RxData, 4);
-        if (chsum == RxData[4]){
-            printf("correct\t\n");
+        /* HAL_UART_Transmit(&huart1, test_, strlen((char *)test_), 30); */
+
+      /* if (test == 1){ */
+
+
+        chsum = checksum(not_i2c_buffer, 4);
+        /* printf("sum: %d\n\t", chsum); */
+
+        if (chsum == not_i2c_buffer[4]){
+            /* printf("correct\t\n"); */
+            /* HAL_UART_Transmit(&huart1, goodtest, strlen((char *)goodtest), 30); */
+
+            printf("noT\n\t");
         }
         else{
-            printf("badly_written\t\n");
+            /* printf("badly_written\t\n"); */
+            HAL_UART_Transmit(&huart1, notest_, strlen((char *)notest_), 30);
         }
       }
 

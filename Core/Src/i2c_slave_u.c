@@ -4,18 +4,21 @@
 #include <string.h>
 
 #define BufferSIZE 5
+
 extern uint8_t i2c_received;
 
-extern uint8_t RxData[BufferSIZE];
-extern uint8_t TxData[BufferSIZE];
+extern uint8_t not_i2c_buffer[BufferSIZE];
+
+uint8_t RxData[BufferSIZE];
+uint8_t TxData[BufferSIZE];
 
 extern I2C_HandleTypeDef hi2c1;
 uint8_t firstData = 1;
 uint8_t count;
 uint16_t last;
 
-
-
+/* void process_data(void){ */
+    /* {} */
 
 void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c)
 {
@@ -72,8 +75,12 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
     }
     else{
         HAL_GPIO_TogglePin(BlueLed_GPIO_Port, BlueLed_Pin);
+        memcpy(&not_i2c_buffer,RxData, BufferSIZE );
+
         i2c_received = 1;
         firstData = 1;
+        /* process_data(); */
+
     }
 
 
