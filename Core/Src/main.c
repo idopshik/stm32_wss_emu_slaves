@@ -11,6 +11,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "i2c_slave_u.h"
+#include "speed_man.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -45,7 +46,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
                             
-uint8_t checksum(uint8_t *array, uint32_t size);
+uint8_t pseudo_checksum(uint8_t *array, uint32_t size);
 
 /* USER CODE END PD */
 
@@ -60,9 +61,16 @@ uint8_t checksum(uint8_t *array, uint32_t size);
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim5;
 
 UART_HandleTypeDef huart1;
 
+
+#define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
+#define TXBUFFERSIZE                      (COUNTOF(aTxBuffer))
+#define RXBUFFERSIZE                      TXBUFFERSIZE
+//TODO 5 isn't correct
 
 #define BufferSIZE 5
 
@@ -77,11 +85,13 @@ uint8_t secu_tick = 0;
 
 uint16_t receive_counters[]  = {0, 0};
 
+whl_chnl *whl_arr[2];
 
 
 
 
 /* USER CODE BEGIN PV */
+
 
 
 /* USER CODE END PV */
@@ -90,6 +100,8 @@ uint16_t receive_counters[]  = {0, 0};
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_TIM5_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
@@ -121,16 +133,25 @@ int _write(int file, char *data, int len)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    secu_tick = 1;
 
     /* uint8_t test_str[] = "Ticki\r\n\0"; */
 
-    /* if (htim->Instance == TIM1) { */
+    if (htim->Instance == TIM1) {
+        secu_tick = 1;
         /* HAL_UART_Transmit(&huart1, test_str, strlen((char *)test_str), 30); */
-    /* } */
+    }
+
+    else if (htim->Instance == TIM2) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
+    }
+    else if (htim->Instance == TIM5) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_1);
+    }
+
 }
 
-uint8_t checksum(uint8_t *array, uint32_t size)
+
+uint8_t pseudo_checksum(uint8_t *array, uint32_t size)
 {
     uint8_t cs = 0;
 
@@ -175,12 +196,17 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_I2C1_Init();
   MX_USART1_UART_Init();
+  MX_I2C1_Init();
   MX_TIM1_Init();
+  MX_TIM2_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
 
     HAL_TIM_Base_Start_IT(&htim1);
+    HAL_TIM_Base_Start_IT(&htim2);
+    HAL_TIM_Base_Start_IT(&htim5);
+
     HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
     
   if(HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
@@ -196,11 +222,28 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-    uint8_t chsum;
-    uint8_t test;
-    test = 1;
 
-    uint8_t testbuf[] = {10, 20, 30, 40, 50};
+
+    /* int arr_WhRPMs[] = {0, 0}; */
+
+    uint8_t chsum;
+    /* uint8_t test; */
+    /* test = 1; */
+
+    whl_chnl fl_whl_s = {numXL, &htim2, 0, 12, 0, 0};
+    whl_chnl *p_xl_whl;
+    p_xl_whl = &fl_whl_s;
+
+    whl_chnl rr_whl_s = {numXR, &htim5, 0, 12, 0, 0};
+    whl_chnl *p_xr_whl;
+    p_xr_whl = &rr_whl_s;
+
+    
+
+    whl_arr[numXL] = p_xl_whl;
+    whl_arr[numXR] = p_xr_whl;
+
+    /* uint8_t testbuf[] = {10, 20, 30, 40, 50}; */
     
   
 
@@ -219,7 +262,7 @@ int main(void)
       /* if (test == 1){ */
 
 
-        chsum = checksum(not_i2c_buffer, 5);
+        chsum = pseudo_checksum(not_i2c_buffer, 5);
         /* printf("sum: %d\n\t", chsum); */
 
         if (chsum == not_i2c_buffer[5]){
@@ -229,10 +272,16 @@ int main(void)
             receive_counters[1] ++ ;
 
             //здесь полезная работа. Вызов функций
-            if (not_i2c_buffer[0] == 0){
+            if (not_i2c_buffer[0] == 0x10){
+                // обрабатываю
+                
+
+                // пропускаю первый элемент (тип команды).
+            TWI_deal(not_i2c_buffer);
+
 
             }
-            else if (not_i2c_buffer[0] == 1){
+            else if (not_i2c_buffer[0] == 0x30){
             } 
             else{
                 //добавить обработчик/регистратор ошибок
@@ -413,9 +462,97 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 2 */
 
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
+/**
+  * @brief TIM5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM5_Init(void)
+{
+
+  /* USER CODE BEGIN TIM5_Init 0 */
+
+  /* USER CODE END TIM5_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM5_Init 1 */
+
+  /* USER CODE END TIM5_Init 1 */
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 0;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 4294967295;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM5_Init 2 */
+
+  /* USER CODE END TIM5_Init 2 */
+
+}
 
 /**
   * @brief USART1 Initialization Function
