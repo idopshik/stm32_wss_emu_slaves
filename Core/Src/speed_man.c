@@ -127,13 +127,14 @@ uint8_t TWI_deal(uint8_t *receive_arr )
     uint16_t newval_0 = 0;
     uint16_t newval_1 = 0;
 
-    newval_0 |= ((int)receive_arr[0]) << 8;
-    newval_0 |= (int)receive_arr[1];
+    //bug found! not from the first!
+    newval_0 |= ((int)receive_arr[1]) << 8;
+    newval_0 |= (int)receive_arr[2];
 
-    newval_1 |= ((int)receive_arr[2]) << 8;
-    newval_1 |= (int)receive_arr[3];
+    newval_1 |= ((int)receive_arr[3]) << 8;
+    newval_1 |= (int)receive_arr[4];
 
-    set_new_speeds(newval_0, newval_1);
+    set_new_speeds((newval_0), (newval_1));
 
     return 0;
 }

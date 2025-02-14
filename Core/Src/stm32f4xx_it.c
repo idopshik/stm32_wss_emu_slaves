@@ -57,8 +57,6 @@
 /* External variables --------------------------------------------------------*/
 extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim1;
-extern TIM_HandleTypeDef htim2;
-extern TIM_HandleTypeDef htim5;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -216,10 +214,6 @@ void TIM1_CC_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles TIM2 global interrupt.
-  */
-
-/**
   * @brief This function handles I2C1 event interrupt.
   */
 void I2C1_EV_IRQHandler(void)
@@ -246,10 +240,6 @@ void I2C1_ER_IRQHandler(void)
 
   /* USER CODE END I2C1_ER_IRQn 1 */
 }
-
-/**
-  * @brief This function handles TIM5 global interrupt.
-  */
 
 /* USER CODE BEGIN 1 */
 
