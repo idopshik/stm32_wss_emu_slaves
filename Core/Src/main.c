@@ -44,7 +44,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define MASTER_W_CMD 0x77
 
 
 /* USER CODE END PTD */
@@ -278,7 +278,7 @@ int main(void)
             receive_counters[1] ++ ;
 
             //здесь полезная работа. Вызов функций
-            if (not_i2c_buffer[0] == 0x10){
+            if (not_i2c_buffer[0] == MASTER_W_CMD){
                 // обрабатываю
                 
 
